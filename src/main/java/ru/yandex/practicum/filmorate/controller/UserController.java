@@ -6,38 +6,51 @@ import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 
 import java.time.LocalDate;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @RestController
 @RequestMapping("/users")
 public class UserController {
-    private final Map<Integer, User> users = new HashMap<>();
+    private final Map<Integer, User> users = new ConcurrentHashMap<>();
+    private final Set<String> emails = new HashSet<>();
     private int idCounter = 1;
 
     @GetMapping
-    public Collection<User> getAllUsers() {
+    public List<User> getAllUsers() {
         log.info("Запрос на получение всех пользователей");
-        return users.values();
+        return new ArrayList<>(users.values());
     }
 
     @PostMapping
     public User createUser(@RequestBody User user) {
         log.info("Начало процесса создания пользователя: {}", user.getLogin());
+
         validate(user);
 
-        // Проверка email на уникальность
-        if (users.values().stream().anyMatch(u -> u.getEmail().equals(user.getEmail()))) {
+        String finalName = (user.getName() == null || user.getName().isBlank())
+                ? user.getLogin()
+                : user.getName();
+
+        if (emails.contains(user.getEmail())) {
             log.warn("Ошибка создания: email {} уже занят", user.getEmail());
             throw new ValidationException("Этот имейл уже используется");
         }
 
-        user.setId(idCounter++);
-        users.put(user.getId(), user);
-        log.info("Пользователь {} успешно создан с id {}", user.getLogin(), user.getId());
-        return user;
+        User newUser = new User(
+                idCounter++,
+                user.getEmail(),
+                user.getLogin(),
+                finalName,
+                user.getBirthday()
+        );
+
+        users.put(newUser.getId(), newUser);
+        emails.add(newUser.getEmail());
+
+        log.info("Пользователь {} успешно создан с id {}", newUser.getLogin(), newUser.getId());
+        return newUser;
     }
 
     @PutMapping
@@ -55,21 +68,35 @@ public class UserController {
             throw new ValidationException("Пользователь не найден");
         }
 
-        // Валидируем обновленные данные
         validate(user);
 
-        // Обновляем все поля
-        existingUser.setEmail(user.getEmail());
-        existingUser.setLogin(user.getLogin());
-        existingUser.setName(user.getName());
-        existingUser.setBirthday(user.getBirthday());
+        String finalName = (user.getName() == null || user.getName().isBlank())
+                ? user.getLogin()
+                : user.getName();
+
+        if (!existingUser.getEmail().equals(user.getEmail())) {
+            if (emails.contains(user.getEmail())) {
+                log.warn("Ошибка обновления: email {} уже занят", user.getEmail());
+                throw new ValidationException("Этот имейл уже используется");
+            }
+            emails.remove(existingUser.getEmail());
+            emails.add(user.getEmail());
+        }
+
+        User updatedUser = new User(
+                user.getId(),
+                user.getEmail(),
+                user.getLogin(),
+                finalName,
+                user.getBirthday()
+        );
+        users.put(user.getId(), updatedUser);
 
         log.info("Пользователь с id {} успешно обновлен", user.getId());
-        return existingUser;
+        return updatedUser;
     }
 
     private void validate(User user) {
-        // Проверка email
         if (user.getEmail() == null || user.getEmail().isBlank()) {
             log.warn("Валидация не пройдена: email не указан");
             throw new ValidationException("Электронная почта не может быть пустой");
@@ -79,7 +106,6 @@ public class UserController {
             throw new ValidationException("Электронная почта должна содержать символ @");
         }
 
-        // Проверка логина
         if (user.getLogin() == null || user.getLogin().isBlank()) {
             log.warn("Валидация не пройдена: логин не указан");
             throw new ValidationException("Логин не может быть пустым");
@@ -89,13 +115,6 @@ public class UserController {
             throw new ValidationException("Логин не может содержать пробелы");
         }
 
-        // Проверка имени (если пустое - используем логин)
-        if (user.getName() == null || user.getName().isBlank()) {
-            log.info("Имя пользователя не указано, используем логин: {}", user.getLogin());
-            user.setName(user.getLogin());
-        }
-
-        // Проверка даты рождения
         if (user.getBirthday() == null) {
             log.warn("Валидация не пройдена: дата рождения не указана");
             throw new ValidationException("Дата рождения должна быть указана");
