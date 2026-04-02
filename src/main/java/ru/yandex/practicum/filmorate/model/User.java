@@ -4,10 +4,10 @@ import lombok.Value;
 import java.time.LocalDate;
 
 @Value
-public class Film {
+public class User {
     Integer id;
+    String email;
+    String login;
     String name;
-    String description;
-    LocalDate releaseDate;
-    Integer duration;
+    LocalDate birthday;
 }
