@@ -38,9 +38,8 @@ public class InMemoryUserStorage implements UserStorage {
                 user.getEmail(),
                 user.getLogin(),
                 user.getName(),
-                user.getBirthday(),
-                new HashSet<>()
-        );
+                user.getBirthday()
+        ); // ← Убрана лишняя скобка
         users.put(newUser.getId(), newUser);
         emailToId.put(newUser.getEmail(), newUser.getId());
         log.info("Пользователь создан с id: {}", newUser.getId());

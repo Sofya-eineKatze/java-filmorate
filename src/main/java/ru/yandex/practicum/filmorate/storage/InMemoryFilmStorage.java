@@ -31,8 +31,7 @@ public class InMemoryFilmStorage implements FilmStorage {
                 film.getName(),
                 film.getDescription(),
                 film.getReleaseDate(),
-                film.getDuration(),
-                new HashSet<>()
+                film.getDuration()
         );
         films.put(newFilm.getId(), newFilm);
         log.info("Фильм '{}' создан с id: {}", newFilm.getName(), newFilm.getId());
