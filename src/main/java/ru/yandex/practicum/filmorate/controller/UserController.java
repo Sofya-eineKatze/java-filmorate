@@ -4,53 +4,52 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.service.UserService;
+import ru.yandex.practicum.filmorate.storage.UserStorage;
 
 import java.time.LocalDate;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @RestController
 @RequestMapping("/users")
 public class UserController {
-    private final Map<Integer, User> users = new ConcurrentHashMap<>();
-    private final Set<String> emails = new HashSet<>();
-    private int idCounter = 1;
+    private final UserStorage userStorage;
+    private final UserService userService;
+
+    public UserController(UserStorage userStorage, UserService userService) {
+        this.userStorage = userStorage;
+        this.userService = userService;
+    }
 
     @GetMapping
     public List<User> getAllUsers() {
         log.info("Запрос на получение всех пользователей");
-        return new ArrayList<>(users.values());
+        return userStorage.getAll();
+    }
+
+    @GetMapping("/{id}")
+    public User getUserById(@PathVariable Integer id) {
+        log.info("Запрос на получение пользователя с id: {}", id);
+        return userStorage.getById(id)
+                .orElseThrow(() -> new ValidationException("Пользователь не найден"));
     }
 
     @PostMapping
     public User createUser(@RequestBody User user) {
         log.info("Начало процесса создания пользователя: {}", user.getLogin());
-
         validate(user);
 
-        String finalName = (user.getName() == null || user.getName().isBlank())
-                ? user.getLogin()
-                : user.getName();
-
-        if (emails.contains(user.getEmail())) {
-            log.warn("Ошибка создания: email {} уже занят", user.getEmail());
-            throw new ValidationException("Этот имейл уже используется");
+        String finalName;
+        if (user.getName() == null || user.getName().isBlank()) {
+            finalName = user.getLogin();
+        } else {
+            finalName = user.getName();
         }
 
-        User newUser = new User(
-                idCounter++,
-                user.getEmail(),
-                user.getLogin(),
-                finalName,
-                user.getBirthday()
-        );
-
-        users.put(newUser.getId(), newUser);
-        emails.add(newUser.getEmail());
-
-        log.info("Пользователь {} успешно создан с id {}", newUser.getLogin(), newUser.getId());
-        return newUser;
+        User userWithName = new User(null, user.getEmail(), user.getLogin(), finalName, user.getBirthday());
+        return userStorage.create(userWithName);
     }
 
     @PutMapping
@@ -62,38 +61,41 @@ public class UserController {
             throw new ValidationException("Id должен быть указан");
         }
 
-        User existingUser = users.get(user.getId());
-        if (existingUser == null) {
+        if (!userStorage.exists(user.getId())) {
             log.warn("Пользователь с id {} не существует", user.getId());
             throw new ValidationException("Пользователь не найден");
         }
 
         validate(user);
-
         String finalName = (user.getName() == null || user.getName().isBlank())
                 ? user.getLogin()
                 : user.getName();
+        User updatedUser = new User(user.getId(), user.getEmail(), user.getLogin(), finalName, user.getBirthday());
+        return userStorage.update(updatedUser);
+    }
 
-        if (!existingUser.getEmail().equals(user.getEmail())) {
-            if (emails.contains(user.getEmail())) {
-                log.warn("Ошибка обновления: email {} уже занят", user.getEmail());
-                throw new ValidationException("Этот имейл уже используется");
-            }
-            emails.remove(existingUser.getEmail());
-            emails.add(user.getEmail());
-        }
+    @PutMapping("/{id}/friends/{friendId}")
+    public void addFriend(@PathVariable Integer id, @PathVariable Integer friendId) {
+        log.info("Пользователь {} добавляет в друзья пользователя {}", id, friendId);
+        userService.addFriend(id, friendId);
+    }
 
-        User updatedUser = new User(
-                user.getId(),
-                user.getEmail(),
-                user.getLogin(),
-                finalName,
-                user.getBirthday()
-        );
-        users.put(user.getId(), updatedUser);
+    @DeleteMapping("/{id}/friends/{friendId}")
+    public void removeFriend(@PathVariable Integer id, @PathVariable Integer friendId) {
+        log.info("Пользователь {} удаляет из друзей пользователя {}", id, friendId);
+        userService.removeFriend(id, friendId);
+    }
 
-        log.info("Пользователь с id {} успешно обновлен", user.getId());
-        return updatedUser;
+    @GetMapping("/{id}/friends")
+    public Set<User> getFriends(@PathVariable Integer id) {
+        log.info("Запрос списка друзей пользователя {}", id);
+        return userService.getFriends(id);
+    }
+
+    @GetMapping("/{id}/friends/common/{otherId}")
+    public Set<User> getCommonFriends(@PathVariable Integer id, @PathVariable Integer otherId) {
+        log.info("Запрос общих друзей пользователей {} и {}", id, otherId);
+        return userService.getCommonFriends(id, otherId);
     }
 
     private void validate(User user) {
@@ -105,7 +107,6 @@ public class UserController {
             log.warn("Валидация не пройдена: email '{}' не содержит символ @", user.getEmail());
             throw new ValidationException("Электронная почта должна содержать символ @");
         }
-
         if (user.getLogin() == null || user.getLogin().isBlank()) {
             log.warn("Валидация не пройдена: логин не указан");
             throw new ValidationException("Логин не может быть пустым");
@@ -114,7 +115,6 @@ public class UserController {
             log.warn("Валидация не пройдена: логин '{}' содержит пробелы", user.getLogin());
             throw new ValidationException("Логин не может содержать пробелы");
         }
-
         if (user.getBirthday() == null) {
             log.warn("Валидация не пройдена: дата рождения не указана");
             throw new ValidationException("Дата рождения должна быть указана");
