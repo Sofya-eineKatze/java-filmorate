@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.controller;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.UserService;
@@ -33,21 +34,16 @@ public class UserController {
     public User getUserById(@PathVariable Integer id) {
         log.info("Запрос на получение пользователя с id: {}", id);
         return userStorage.getById(id)
-                .orElseThrow(() -> new ValidationException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
     }
 
     @PostMapping
     public User createUser(@RequestBody User user) {
         log.info("Начало процесса создания пользователя: {}", user.getLogin());
         validate(user);
-
-        String finalName;
-        if (user.getName() == null || user.getName().isBlank()) {
-            finalName = user.getLogin();
-        } else {
-            finalName = user.getName();
-        }
-
+        String finalName = (user.getName() == null || user.getName().isBlank())
+                ? user.getLogin()
+                : user.getName();
         User userWithName = new User(null, user.getEmail(), user.getLogin(), finalName, user.getBirthday());
         return userStorage.create(userWithName);
     }
@@ -63,7 +59,7 @@ public class UserController {
 
         if (!userStorage.exists(user.getId())) {
             log.warn("Пользователь с id {} не существует", user.getId());
-            throw new ValidationException("Пользователь не найден");
+            throw new NotFoundException("Пользователь не найден");
         }
 
         validate(user);

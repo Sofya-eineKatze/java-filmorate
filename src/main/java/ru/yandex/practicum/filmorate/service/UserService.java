@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
@@ -25,9 +26,9 @@ public class UserService {
         }
 
         User user = userStorage.getById(userId)
-                .orElseThrow(() -> new ValidationException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
         User friend = userStorage.getById(friendId)
-                .orElseThrow(() -> new ValidationException("Друг не найден"));
+                .orElseThrow(() -> new NotFoundException("Друг не найден"));
 
         Set<Integer> userFriends = new HashSet<>(user.getFriends());
         Set<Integer> friendFriends = new HashSet<>(friend.getFriends());
@@ -44,12 +45,11 @@ public class UserService {
         log.info("Пользователь {} и {} стали друзьями", userId, friendId);
     }
 
-
     public void removeFriend(Integer userId, Integer friendId) {
         User user = userStorage.getById(userId)
-                .orElseThrow(() -> new ValidationException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
         User friend = userStorage.getById(friendId)
-                .orElseThrow(() -> new ValidationException("Друг не найден"));
+                .orElseThrow(() -> new NotFoundException("Друг не найден"));
 
         Set<Integer> userFriends = new HashSet<>(user.getFriends());
         Set<Integer> friendFriends = new HashSet<>(friend.getFriends());
@@ -68,7 +68,7 @@ public class UserService {
 
     public Set<User> getFriends(Integer userId) {
         User user = userStorage.getById(userId)
-                .orElseThrow(() -> new ValidationException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         return user.getFriends().stream()
                 .map(id -> userStorage.getById(id).orElse(null))
@@ -78,9 +78,9 @@ public class UserService {
 
     public Set<User> getCommonFriends(Integer userId, Integer otherId) {
         User user = userStorage.getById(userId)
-                .orElseThrow(() -> new ValidationException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
         User other = userStorage.getById(otherId)
-                .orElseThrow(() -> new ValidationException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         Set<Integer> commonIds = new HashSet<>(user.getFriends());
         commonIds.retainAll(other.getFriends());

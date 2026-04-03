@@ -2,7 +2,7 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.storage.FilmStorage;
 
@@ -22,7 +22,7 @@ public class FilmService {
 
     public void addLike(Integer filmId, Integer userId) {
         Film film = filmStorage.getById(filmId)
-                .orElseThrow(() -> new ValidationException("Фильм не найден"));
+                .orElseThrow(() -> new NotFoundException("Фильм не найден"));
 
         Set<Integer> likes = new HashSet<>(film.getLikes());
         if (likes.add(userId)) {
@@ -39,7 +39,7 @@ public class FilmService {
 
     public void removeLike(Integer filmId, Integer userId) {
         Film film = filmStorage.getById(filmId)
-                .orElseThrow(() -> new ValidationException("Фильм не найден"));
+                .orElseThrow(() -> new NotFoundException("Фильм не найден"));
 
         Set<Integer> likes = new HashSet<>(film.getLikes());
         if (likes.remove(userId)) {
