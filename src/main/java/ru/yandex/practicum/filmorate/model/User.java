@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Value;
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -12,6 +13,8 @@ public class User {
     String login;
     String name;
     LocalDate birthday;
+
+    @JsonIgnore
     Set<Integer> friends;
 
     public User(Integer id, String email, String login, String name, LocalDate birthday) {
