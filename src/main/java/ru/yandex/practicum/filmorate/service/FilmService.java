@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.storage.FilmStorage;
+import ru.yandex.practicum.filmorate.storage.UserStorage;
 
 import java.util.HashSet;
 import java.util.List;
@@ -15,14 +16,19 @@ import java.util.stream.Collectors;
 @Service
 public class FilmService {
     private final FilmStorage filmStorage;
+    private final UserStorage userStorage;
 
-    public FilmService(FilmStorage filmStorage) {
+    public FilmService(FilmStorage filmStorage, UserStorage userStorage) {
         this.filmStorage = filmStorage;
+        this.userStorage = userStorage;
     }
 
     public void addLike(Integer filmId, Integer userId) {
         Film film = filmStorage.getById(filmId)
                 .orElseThrow(() -> new NotFoundException("Фильм не найден"));
+
+        userStorage.getById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         Set<Integer> likes = new HashSet<>(film.getLikes());
         if (likes.add(userId)) {
@@ -40,6 +46,9 @@ public class FilmService {
     public void removeLike(Integer filmId, Integer userId) {
         Film film = filmStorage.getById(filmId)
                 .orElseThrow(() -> new NotFoundException("Фильм не найден"));
+
+        userStorage.getById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         Set<Integer> likes = new HashSet<>(film.getLikes());
         if (likes.remove(userId)) {
