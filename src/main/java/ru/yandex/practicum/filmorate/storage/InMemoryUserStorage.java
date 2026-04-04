@@ -79,9 +79,11 @@ public class InMemoryUserStorage implements UserStorage {
 
     @Override
     public void delete(Integer id) {
-        users.remove(id);
-        emailToId.remove(id);
-        log.info("Пользователь с id {} удален", id);
+        User user = users.remove(id);
+        if (user != null) {
+            emailToId.remove(user.getEmail());  // ← исправлено!
+            log.info("Пользователь с id {} удален", id);
+        }
     }
 
     @Override
