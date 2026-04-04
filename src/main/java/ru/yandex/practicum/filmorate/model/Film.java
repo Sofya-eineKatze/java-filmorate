@@ -1,12 +1,16 @@
 package ru.yandex.practicum.filmorate.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import lombok.Value;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 
 @Value
+@NoArgsConstructor(force = true)
+@AllArgsConstructor
 public class Film {
     Integer id;
     String name;
@@ -17,16 +21,8 @@ public class Film {
     @JsonIgnore
     Set<Integer> likes;
 
+    // Конструктор без likes для удобства
     public Film(Integer id, String name, String description, LocalDate releaseDate, Integer duration) {
         this(id, name, description, releaseDate, duration, new HashSet<>());
-    }
-
-    public Film(Integer id, String name, String description, LocalDate releaseDate, Integer duration, Set<Integer> likes) {
-        this.id = id;
-        this.name = name;
-        this.description = description;
-        this.releaseDate = releaseDate;
-        this.duration = duration;
-        this.likes = likes != null ? likes : new HashSet<>();
     }
 }
