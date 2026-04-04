@@ -2,12 +2,11 @@ package ru.yandex.practicum.filmorate.storage;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -28,7 +27,12 @@ public class InMemoryUserStorage implements UserStorage {
     }
 
     @Override
-    public User save(User user) {
+    public User create(User user) {
+        if (emailToId.containsKey(user.getEmail())) {
+            log.warn("Email {} уже используется", user.getEmail());
+            throw new ValidationException("Этот имейл уже используется");
+        }
+
         User newUser = new User(
                 idCounter++,
                 user.getEmail(),
@@ -38,28 +42,45 @@ public class InMemoryUserStorage implements UserStorage {
         );
         users.put(newUser.getId(), newUser);
         emailToId.put(newUser.getEmail(), newUser.getId());
-        log.info("Пользователь сохранен с id: {}", newUser.getId());
+        log.info("Пользователь создан с id: {}", newUser.getId());
         return newUser;
     }
 
     @Override
     public User update(User user) {
+        if (!users.containsKey(user.getId())) {
+            log.warn("Пользователь с id {} не найден", user.getId());
+            throw new NotFoundException("Пользователь не найден");
+        }
+
         User oldUser = users.get(user.getId());
+
         if (!oldUser.getEmail().equals(user.getEmail())) {
+            if (emailToId.containsKey(user.getEmail())) {
+                log.warn("Email {} уже используется", user.getEmail());
+                throw new ValidationException("Этот имейл уже используется");
+            }
             emailToId.remove(oldUser.getEmail());
             emailToId.put(user.getEmail(), user.getId());
         }
-        users.put(user.getId(), user);
+
+        User updatedUser = new User(
+                user.getId(),
+                user.getEmail(),
+                user.getLogin(),
+                user.getName(),
+                user.getBirthday(),
+                user.getFriends()
+        );
+        users.put(user.getId(), updatedUser);
         log.info("Пользователь с id {} обновлен", user.getId());
-        return user;
+        return updatedUser;
     }
 
     @Override
     public void delete(Integer id) {
-        User user = users.remove(id);
-        if (user != null) {
-            emailToId.remove(user.getEmail());
-        }
+        users.remove(id);
+        emailToId.remove(id);
         log.info("Пользователь с id {} удален", id);
     }
 

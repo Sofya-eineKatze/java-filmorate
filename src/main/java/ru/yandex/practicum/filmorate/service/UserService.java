@@ -44,18 +44,20 @@ public class UserService {
         }
 
         User userWithName = new User(null, user.getEmail(), user.getLogin(), finalName, user.getBirthday());
-        return userStorage.save(userWithName);
+        return userStorage.create(userWithName);
     }
 
     public User updateUser(User user) {
-        log.info("Обновление пользователя: id={}", user.getId());
+        log.info("Обновление пользователя с id: {}", user.getId());
 
         if (user.getId() == null) {
             throw new ValidationException("Id должен быть указан");
         }
+
         if (!userStorage.exists(user.getId())) {
             throw new NotFoundException("Пользователь не найден");
         }
+
         validate(user);
 
         String finalName = (user.getName() == null || user.getName().isBlank())
@@ -64,6 +66,26 @@ public class UserService {
 
         User updatedUser = new User(user.getId(), user.getEmail(), user.getLogin(), finalName, user.getBirthday());
         return userStorage.update(updatedUser);
+    }
+
+    public void deleteUser(Integer userId) {
+        User user = userStorage.getById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+
+        for (User u : userStorage.getAll()) {
+            if (u.getFriends().contains(userId)) {
+                Set<Integer> newFriends = new HashSet<>(u.getFriends());
+                newFriends.remove(userId);
+                User updated = new User(
+                        u.getId(), u.getEmail(), u.getLogin(),
+                        u.getName(), u.getBirthday(), newFriends
+                );
+                userStorage.update(updated);
+            }
+        }
+
+        userStorage.delete(userId);
+        log.info("Пользователь с id {} удален", userId);
     }
 
     public void addFriend(Integer userId, Integer friendId) {
