@@ -64,24 +64,16 @@ public class InMemoryUserStorage implements UserStorage {
             emailToId.put(user.getEmail(), user.getId());
         }
 
-        User updatedUser = new User(
-                user.getId(),
-                user.getEmail(),
-                user.getLogin(),
-                user.getName(),
-                user.getBirthday(),
-                user.getFriends()
-        );
-        users.put(user.getId(), updatedUser);
+        users.put(user.getId(), user);
         log.info("Пользователь с id {} обновлен", user.getId());
-        return updatedUser;
+        return user;
     }
 
     @Override
     public void delete(Integer id) {
         User user = users.remove(id);
         if (user != null) {
-            emailToId.remove(user.getEmail());  // ← исправлено!
+            emailToId.remove(user.getEmail());
             log.info("Пользователь с id {} удален", id);
         }
     }
