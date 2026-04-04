@@ -16,16 +16,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class FilmControllerTest {
     private FilmController filmController;
-    private FilmStorage filmStorage;
-    private UserStorage userStorage;
     private FilmService filmService;
 
     @BeforeEach
     void setUp() {
-        filmStorage = new InMemoryFilmStorage();
-        userStorage = new InMemoryUserStorage();
+        FilmStorage filmStorage = new InMemoryFilmStorage();
+        UserStorage userStorage = new InMemoryUserStorage();
         filmService = new FilmService(filmStorage, userStorage);
-        filmController = new FilmController(filmStorage, filmService);
+        filmController = new FilmController(filmService);
     }
 
     @Test

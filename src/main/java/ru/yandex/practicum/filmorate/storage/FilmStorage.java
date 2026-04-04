@@ -9,7 +9,7 @@ public interface FilmStorage {
 
     Optional<Film> getById(Integer id);
 
-    Film create(Film film);
+    Film save(Film film);
 
     Film update(Film film);
 

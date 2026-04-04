@@ -9,7 +9,7 @@ public interface UserStorage {
 
     Optional<User> getById(Integer id);
 
-    User create(User user);
+    User save(User user);
 
     User update(User user);
 

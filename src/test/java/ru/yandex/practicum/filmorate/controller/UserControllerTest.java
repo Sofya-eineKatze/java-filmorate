@@ -14,14 +14,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class UserControllerTest {
     private UserController userController;
-    private UserStorage userStorage;
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userStorage = new InMemoryUserStorage();
+        UserStorage userStorage = new InMemoryUserStorage();
         userService = new UserService(userStorage);
-        userController = new UserController(userStorage, userService);
+        userController = new UserController(userService);
     }
 
     @Test

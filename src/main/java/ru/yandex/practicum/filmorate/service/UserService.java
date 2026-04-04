@@ -7,7 +7,9 @@ import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
 
+import java.time.LocalDate;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -18,6 +20,47 @@ public class UserService {
 
     public UserService(UserStorage userStorage) {
         this.userStorage = userStorage;
+    }
+
+    public List<User> getAllUsers() {
+        return userStorage.getAll();
+    }
+
+    public User getUserById(Integer id) {
+        return userStorage.getById(id)
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+    }
+
+    public User createUser(User user) {
+        validate(user);
+
+        String finalName = (user.getName() == null || user.getName().isBlank())
+                ? user.getLogin()
+                : user.getName();
+
+        if (userStorage.emailExists(user.getEmail())) {
+            throw new ValidationException("Этот имейл уже используется");
+        }
+
+        User userWithName = new User(null, user.getEmail(), user.getLogin(), finalName, user.getBirthday());
+        return userStorage.save(userWithName);
+    }
+
+    public User updateUser(User user) {
+        if (user.getId() == null) {
+            throw new ValidationException("Id должен быть указан");
+        }
+        if (!userStorage.exists(user.getId())) {
+            throw new NotFoundException("Пользователь не найден");
+        }
+        validate(user);
+
+        String finalName = (user.getName() == null || user.getName().isBlank())
+                ? user.getLogin()
+                : user.getName();
+
+        User updatedUser = new User(user.getId(), user.getEmail(), user.getLogin(), finalName, user.getBirthday());
+        return userStorage.update(updatedUser);
     }
 
     public void addFriend(Integer userId, Integer friendId) {
@@ -89,5 +132,26 @@ public class UserService {
                 .map(id -> userStorage.getById(id).orElse(null))
                 .filter(u -> u != null)
                 .collect(Collectors.toSet());
+    }
+
+    private void validate(User user) {
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
+            throw new ValidationException("Электронная почта не может быть пустой");
+        }
+        if (!user.getEmail().contains("@")) {
+            throw new ValidationException("Электронная почта должна содержать символ @");
+        }
+        if (user.getLogin() == null || user.getLogin().isBlank()) {
+            throw new ValidationException("Логин не может быть пустым");
+        }
+        if (user.getLogin().contains(" ")) {
+            throw new ValidationException("Логин не может содержать пробелы");
+        }
+        if (user.getBirthday() == null) {
+            throw new ValidationException("Дата рождения должна быть указана");
+        }
+        if (user.getBirthday().isAfter(LocalDate.now())) {
+            throw new ValidationException("Дата рождения не может быть в будущем");
+        }
     }
 }
