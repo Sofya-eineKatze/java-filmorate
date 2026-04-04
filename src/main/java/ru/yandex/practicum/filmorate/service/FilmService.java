@@ -28,31 +28,46 @@ public class FilmService {
     }
 
     public List<Film> getAllFilms() {
+        log.info("Запрос на получение всех фильмов");
         return filmStorage.getAll();
     }
 
     public Film getFilmById(Integer id) {
+        log.info("Запрос на получение фильма с id: {}", id);
         return filmStorage.getById(id)
                 .orElseThrow(() -> new NotFoundException("Фильм не найден"));
     }
 
     public Film createFilm(Film film) {
+        log.info("Создание фильма: {}", film.getName());
         validate(film);
-        return filmStorage.save(film);
+        Film savedFilm = filmStorage.save(film);
+        log.info("Фильм создан с id: {}", savedFilm.getId());
+        return savedFilm;
     }
 
     public Film updateFilm(Film film) {
+        log.info("Обновление фильма с id: {}", film.getId());
+
         if (film.getId() == null) {
+            log.warn("Ошибка обновления: id фильма не указан");
             throw new ValidationException("Id фильма должен быть указан");
         }
+
         if (!filmStorage.exists(film.getId())) {
+            log.warn("Ошибка обновления: фильм с id {} не найден", film.getId());
             throw new NotFoundException("Фильм не найден");
         }
+
         validate(film);
-        return filmStorage.update(film);
+        Film updatedFilm = filmStorage.update(film);
+        log.info("Фильм с id {} обновлен", film.getId());
+        return updatedFilm;
     }
 
     public void addLike(Integer filmId, Integer userId) {
+        log.info("Пользователь {} ставит лайк фильму {}", userId, filmId);
+
         Film film = filmStorage.getById(filmId)
                 .orElseThrow(() -> new NotFoundException("Фильм не найден"));
 
@@ -73,6 +88,8 @@ public class FilmService {
     }
 
     public void removeLike(Integer filmId, Integer userId) {
+        log.info("Пользователь {} удаляет лайк с фильма {}", userId, filmId);
+
         Film film = filmStorage.getById(filmId)
                 .orElseThrow(() -> new NotFoundException("Фильм не найден"));
 
@@ -91,6 +108,7 @@ public class FilmService {
     }
 
     public List<Film> getPopularFilms(int count) {
+        log.info("Запрос на получение {} популярных фильмов", count);
         return filmStorage.getAll().stream()
                 .sorted((f1, f2) -> Integer.compare(f2.getLikes().size(), f1.getLikes().size()))
                 .limit(count)
@@ -99,18 +117,27 @@ public class FilmService {
 
     private void validate(Film film) {
         if (film.getName() == null || film.getName().isBlank()) {
+            log.warn("Валидация не пройдена: пустое название фильма");
             throw new ValidationException("Название не может быть пустым");
         }
+
         if (film.getDescription() != null && film.getDescription().length() > MAX_DESCRIPTION_LENGTH) {
+            log.warn("Валидация не пройдена: описание фильма превышает {} символов", MAX_DESCRIPTION_LENGTH);
             throw new ValidationException("Описание не может быть длиннее " + MAX_DESCRIPTION_LENGTH + " символов");
         }
+
         if (film.getReleaseDate() == null) {
+            log.warn("Валидация не пройдена: дата релиза не указана");
             throw new ValidationException("Дата релиза должна быть указана");
         }
+
         if (film.getReleaseDate().isBefore(CINEMA_BIRTHDAY)) {
+            log.warn("Валидация не пройдена: дата релиза {} раньше 1895 года", film.getReleaseDate());
             throw new ValidationException("Дата релиза не может быть раньше 28 декабря 1895 года");
         }
+
         if (film.getDuration() == null || film.getDuration() <= 0) {
+            log.warn("Валидация не пройдена: продолжительность фильма {} не положительная", film.getDuration());
             throw new ValidationException("Продолжительность фильма должна быть положительной");
         }
     }

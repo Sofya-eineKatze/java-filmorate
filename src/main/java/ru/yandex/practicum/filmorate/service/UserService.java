@@ -32,6 +32,7 @@ public class UserService {
     }
 
     public User createUser(User user) {
+        log.info("Создание пользователя: {}", user.getLogin());
         validate(user);
 
         String finalName = (user.getName() == null || user.getName().isBlank())
@@ -47,6 +48,8 @@ public class UserService {
     }
 
     public User updateUser(User user) {
+        log.info("Обновление пользователя: id={}", user.getId());
+
         if (user.getId() == null) {
             throw new ValidationException("Id должен быть указан");
         }
