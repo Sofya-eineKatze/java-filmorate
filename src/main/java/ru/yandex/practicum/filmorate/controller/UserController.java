@@ -18,6 +18,12 @@ public class UserController {
         this.userService = userService;
     }
 
+    @PostMapping
+    public User createUser(@RequestBody User user) {
+        log.info("Начало процесса создания пользователя: {}", user.getLogin());
+        return userService.createUser(user);
+    }
+
     @GetMapping
     public List<User> getAllUsers() {
         log.info("Запрос на получение всех пользователей");
@@ -28,12 +34,6 @@ public class UserController {
     public User getUserById(@PathVariable Integer id) {
         log.info("Запрос на получение пользователя с id: {}", id);
         return userService.getUserById(id);
-    }
-
-    @PostMapping
-    public User createUser(@RequestBody User user) {
-        log.info("Начало процесса создания пользователя: {}", user.getLogin());
-        return userService.createUser(user);
     }
 
     @PutMapping
