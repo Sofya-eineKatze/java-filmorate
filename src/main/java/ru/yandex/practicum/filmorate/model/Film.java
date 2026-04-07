@@ -22,7 +22,7 @@ public class Film {
     Set<Integer> likes;
 
     Set<Genre> genres;
-    MpaRating mpaRating;
+    MpaRating mpa;  // ← изменено с mpaRating на mpa
 
     public Film(Integer id, String name, String description, LocalDate releaseDate, Integer duration) {
         this(id, name, description, releaseDate, duration, new HashSet<>(), null, null);

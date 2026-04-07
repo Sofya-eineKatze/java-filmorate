@@ -15,6 +15,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -26,10 +27,7 @@ public class UserDbStorage implements UserStorage {
     public List<User> getAll() {
         String sql = "SELECT * FROM users";
         List<User> users = jdbcTemplate.query(sql, new UserRowMapper());
-        for (User user : users) {
-            loadFriends(user);
-        }
-        return users;
+        return loadFriendsForUsers(users);
     }
 
     @Override
@@ -39,9 +37,8 @@ public class UserDbStorage implements UserStorage {
         if (users.isEmpty()) {
             return Optional.empty();
         }
-        User user = users.get(0);
-        loadFriends(user);
-        return Optional.of(user);
+        List<User> result = loadFriendsForUsers(users);
+        return Optional.of(result.get(0));
     }
 
     @Override
@@ -107,17 +104,36 @@ public class UserDbStorage implements UserStorage {
         return count != null && count > 0;
     }
 
-    private void loadFriends(User user) {
-        String sql = "SELECT friend_id FROM friendship WHERE user_id = ? AND status = true";
-        List<Integer> friendIds = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getInt("friend_id"), user.getId());
-        user = new User(
-                user.getId(),
-                user.getEmail(),
-                user.getLogin(),
-                user.getName(),
-                user.getBirthday(),
-                new HashSet<>(friendIds)
-        );
+    private List<User> loadFriendsForUsers(List<User> users) {
+        if (users.isEmpty()) return users;
+
+        List<Integer> userIds = users.stream().map(User::getId).collect(Collectors.toList());
+        String ids = userIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+
+        Map<Integer, Set<Integer>> friendsMap = new HashMap<>();
+
+        if (!userIds.isEmpty()) {
+            String sql = "SELECT user_id, friend_id FROM friendship WHERE user_id IN (%s) AND status = true".formatted(ids);
+            jdbcTemplate.query(sql, rs -> {
+                Integer userId = rs.getInt("user_id");
+                Integer friendId = rs.getInt("friend_id");
+                friendsMap.computeIfAbsent(userId, k -> new HashSet<>()).add(friendId);
+            });
+        }
+
+        List<User> result = new ArrayList<>();
+        for (User oldUser : users) {
+            User newUser = new User(
+                    oldUser.getId(),
+                    oldUser.getEmail(),
+                    oldUser.getLogin(),
+                    oldUser.getName(),
+                    oldUser.getBirthday(),
+                    friendsMap.getOrDefault(oldUser.getId(), new HashSet<>())
+            );
+            result.add(newUser);
+        }
+        return result;
     }
 
     private static class UserRowMapper implements RowMapper<User> {

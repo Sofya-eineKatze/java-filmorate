@@ -12,10 +12,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.MpaRating;
 
 import java.time.LocalDate;
 import java.util.HashSet;
+import java.util.Set;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -37,22 +39,23 @@ class FilmControllerTest {
 
     @BeforeEach
     void setUp() {
-        // Очищаем таблицы перед каждым тестом
         jdbcTemplate.execute("DELETE FROM likes");
         jdbcTemplate.execute("DELETE FROM film_genres");
         jdbcTemplate.execute("DELETE FROM films");
+        jdbcTemplate.execute("DELETE FROM users");
         jdbcTemplate.execute("ALTER TABLE films ALTER COLUMN id RESTART WITH 1");
-
-        // Добавляем тестовые данные в справочники
-        jdbcTemplate.execute("MERGE INTO mpa_ratings (id, name) VALUES (1, 'G'), (2, 'PG')");
-        jdbcTemplate.execute("MERGE INTO genres (id, name) VALUES (1, 'Комедия'), (2, 'Драма')");
+        jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN id RESTART WITH 1");
+        jdbcTemplate.execute("MERGE INTO mpa_ratings (id, name) VALUES (1, 'G'), (2, 'PG'), (3, 'PG-13'), (4, 'R'), (5, 'NC-17')");
+        jdbcTemplate.execute("MERGE INTO genres (id, name) VALUES (1, 'Комедия'), (2, 'Драма'), (3, 'Мультфильм'), (4, 'Триллер'), (5, 'Документальный'), (6, 'Боевик')");
     }
 
     @Test
     void shouldAddFilmWhenDataIsValid() throws Exception {
+        Set<Genre> genres = new HashSet<>();
+        genres.add(new Genre(1, "Комедия"));
         MpaRating mpa = new MpaRating(1, "G");
         Film film = new Film(null, "Inception", "Great movie about dreams",
-                LocalDate.of(2010, 7, 16), 148, new HashSet<>(), new HashSet<>(), mpa);
+                LocalDate.of(2010, 7, 16), 148, new HashSet<>(), genres, mpa);
 
         mockMvc.perform(post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -60,7 +63,9 @@ class FilmControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.name").value("Inception"))
-                .andExpect(jsonPath("$.duration").value(148));
+                .andExpect(jsonPath("$.duration").value(148))
+                .andExpect(jsonPath("$.mpa.id").value(1))
+                .andExpect(jsonPath("$.genres.length()").value(1));
     }
 
     @Test
@@ -136,7 +141,6 @@ class FilmControllerTest {
 
     @Test
     void shouldAddLike() throws Exception {
-        // Создаём пользователя
         String userJson = "{\"email\":\"test@mail.ru\",\"login\":\"testLogin\",\"name\":\"Test\",\"birthday\":\"2000-01-01\"}";
         String userResponse = mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -148,7 +152,6 @@ class FilmControllerTest {
 
         Integer userId = objectMapper.readTree(userResponse).get("id").asInt();
 
-        // Создаём фильм
         MpaRating mpa = new MpaRating(1, "G");
         Film film = new Film(null, "Liked Film", "Desc",
                 LocalDate.of(2020, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
@@ -163,14 +166,12 @@ class FilmControllerTest {
 
         Integer filmId = objectMapper.readTree(filmResponse).get("id").asInt();
 
-        // Добавляем лайк
         mockMvc.perform(put("/films/{id}/like/{userId}", filmId, userId))
                 .andExpect(status().isOk());
     }
 
     @Test
     void shouldGetPopularFilms() throws Exception {
-        // Создаём пользователя
         String userJson = "{\"email\":\"popular@mail.ru\",\"login\":\"popularLogin\",\"name\":\"Popular\",\"birthday\":\"2000-01-01\"}";
         String userResponse = mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -182,7 +183,6 @@ class FilmControllerTest {
 
         Integer userId = objectMapper.readTree(userResponse).get("id").asInt();
 
-        // Создаём фильмы
         MpaRating mpa = new MpaRating(1, "G");
         Film film1 = new Film(null, "Popular Film", "Desc1", LocalDate.of(2020, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
         Film film2 = new Film(null, "Not Popular Film", "Desc2", LocalDate.of(2020, 1, 1), 90, new HashSet<>(), new HashSet<>(), mpa);
@@ -197,11 +197,9 @@ class FilmControllerTest {
 
         Integer film1Id = objectMapper.readTree(film1Response).get("id").asInt();
 
-        // Добавляем лайк популярному фильму
         mockMvc.perform(put("/films/{id}/like/{userId}", film1Id, userId))
                 .andExpect(status().isOk());
 
-        // Проверяем популярные фильмы
         mockMvc.perform(get("/films/popular"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].name").value("Popular Film"));
