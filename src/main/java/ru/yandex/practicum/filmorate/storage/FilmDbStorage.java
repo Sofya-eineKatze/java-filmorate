@@ -27,10 +27,10 @@ public class FilmDbStorage implements FilmStorage {
     @Override
     public List<Film> getAll() {
         String sql = """
-            SELECT f.*, m.id as mpa_id, m.name as mpa_name 
-            FROM films f
-            LEFT JOIN mpa_ratings m ON f.mpa_rating_id = m.id
-            """;
+                SELECT f.*, m.id as mpa_id, m.name as mpa_name 
+                FROM films f
+                LEFT JOIN mpa_ratings m ON f.mpa_rating_id = m.id
+                """;
 
         List<Film> films = jdbcTemplate.query(sql, new FilmRowMapper());
         return loadGenresAndLikes(films);
@@ -39,11 +39,11 @@ public class FilmDbStorage implements FilmStorage {
     @Override
     public Optional<Film> getById(Integer id) {
         String sql = """
-            SELECT f.*, m.id as mpa_id, m.name as mpa_name 
-            FROM films f
-            LEFT JOIN mpa_ratings m ON f.mpa_rating_id = m.id
-            WHERE f.id = ?
-            """;
+                SELECT f.*, m.id as mpa_id, m.name as mpa_name 
+                FROM films f
+                LEFT JOIN mpa_ratings m ON f.mpa_rating_id = m.id
+                WHERE f.id = ?
+                """;
 
         List<Film> films = jdbcTemplate.query(sql, new FilmRowMapper(), id);
         if (films.isEmpty()) {
@@ -120,15 +120,15 @@ public class FilmDbStorage implements FilmStorage {
     @Override
     public List<Film> getPopular(int count) {
         String sql = """
-            SELECT f.*, m.id as mpa_id, m.name as mpa_name,
-                   COUNT(l.user_id) as likes_count
-            FROM films f
-            LEFT JOIN mpa_ratings m ON f.mpa_rating_id = m.id
-            LEFT JOIN likes l ON f.id = l.film_id
-            GROUP BY f.id
-            ORDER BY likes_count DESC
-            LIMIT ?
-            """;
+                SELECT f.*, m.id as mpa_id, m.name as mpa_name,
+                       COUNT(l.user_id) as likes_count
+                FROM films f
+                LEFT JOIN mpa_ratings m ON f.mpa_rating_id = m.id
+                LEFT JOIN likes l ON f.id = l.film_id
+                GROUP BY f.id
+                ORDER BY likes_count DESC
+                LIMIT ?
+                """;
 
         List<Film> films = jdbcTemplate.query(sql, new FilmRowMapper(), count);
         return loadGenresAndLikes(films);
@@ -156,12 +156,12 @@ public class FilmDbStorage implements FilmStorage {
 
         if (!filmIds.isEmpty()) {
             String genresSql = """
-                SELECT fg.film_id, g.id, g.name 
-                FROM film_genres fg
-                JOIN genres g ON fg.genre_id = g.id
-                WHERE fg.film_id IN (%s)
-                ORDER BY g.id
-                """.formatted(ids);
+                    SELECT fg.film_id, g.id, g.name 
+                    FROM film_genres fg
+                    JOIN genres g ON fg.genre_id = g.id
+                    WHERE fg.film_id IN (%s)
+                    ORDER BY g.id
+                    """.formatted(ids);
 
             jdbcTemplate.query(genresSql, rs -> {
                 Integer filmId = rs.getInt("film_id");
