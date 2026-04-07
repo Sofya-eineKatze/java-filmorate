@@ -72,7 +72,7 @@ public class UserService {
             throw new NotFoundException("Пользователь не найден");
         }
 
-        jdbcTemplate.update("DELETE FROM friendship WHERE user_id = ? OR friend_id = ?", userId, userId);
+        jdbcTemplate.update("DELETE FROM friendship WHERE user_id = ?", userId);
         userStorage.delete(userId);
         log.info("Пользователь с id {} удален", userId);
     }
@@ -89,25 +89,31 @@ public class UserService {
             throw new NotFoundException("Друг не найден");
         }
 
-        // Создаём или обновляем записи в обе стороны со статусом true
-        jdbcTemplate.update("MERGE INTO friendship (user_id, friend_id, status) VALUES (?, ?, ?)", userId, friendId, true);
-        jdbcTemplate.update("MERGE INTO friendship (user_id, friend_id, status) VALUES (?, ?, ?)", friendId, userId, true);
-
-        log.info("Пользователь {} и {} теперь друзья", userId, friendId);
-    }
-
-    public void removeFriend(Integer userId, Integer friendId) {
-        // Проверяем, существует ли дружба
+        // Проверяем, есть ли уже заявка
         String checkSql = "SELECT COUNT(*) FROM friendship WHERE user_id = ? AND friend_id = ?";
         Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class, userId, friendId);
 
-        if (count == null || count == 0) {
-            throw new NotFoundException("Дружба не найдена");
+        if (count != null && count > 0) {
+            jdbcTemplate.update("UPDATE friendship SET status = true WHERE user_id = ? AND friend_id = ?", userId, friendId);
+        } else {
+            jdbcTemplate.update("INSERT INTO friendship (user_id, friend_id, status) VALUES (?, ?, ?)", userId, friendId, true);
         }
 
+        log.info("Пользователь {} добавил в друзья пользователя {}", userId, friendId);
+    }
+
+    public void removeFriend(Integer userId, Integer friendId) {
+        // Проверяем, существуют ли пользователи
+        if (!userStorage.exists(userId)) {
+            throw new NotFoundException("Пользователь не найден");
+        }
+        if (!userStorage.exists(friendId)) {
+            throw new NotFoundException("Друг не найден");
+        }
+
+        // Удаляем дружбу (если она есть)
         jdbcTemplate.update("DELETE FROM friendship WHERE user_id = ? AND friend_id = ?", userId, friendId);
-        jdbcTemplate.update("DELETE FROM friendship WHERE user_id = ? AND friend_id = ?", friendId, userId);
-        log.info("Пользователь {} и {} больше не друзья", userId, friendId);
+        log.info("Пользователь {} удалил из друзей пользователя {}", userId, friendId);
     }
 
     public Set<User> getFriends(Integer userId) {
