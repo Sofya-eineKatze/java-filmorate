@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
@@ -9,23 +10,16 @@ import ru.yandex.practicum.filmorate.storage.FilmStorage;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
 
 import java.time.LocalDate;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class FilmService {
     private final FilmStorage filmStorage;
     private final UserStorage userStorage;
     private static final LocalDate CINEMA_BIRTHDAY = LocalDate.of(1895, 12, 28);
     private static final int MAX_DESCRIPTION_LENGTH = 200;
-
-    public FilmService(FilmStorage filmStorage, UserStorage userStorage) {
-        this.filmStorage = filmStorage;
-        this.userStorage = userStorage;
-    }
 
     public List<Film> getAllFilms() {
         return filmStorage.getAll();
@@ -58,52 +52,29 @@ public class FilmService {
     }
 
     public void addLike(Integer filmId, Integer userId) {
-        Film film = filmStorage.getById(filmId)
-                .orElseThrow(() -> new NotFoundException("Фильм не найден"));
-
-        userStorage.getById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
-
-        Set<Integer> likes = new HashSet<>(film.getLikes());
-        if (likes.add(userId)) {
-            Film updatedFilm = new Film(
-                    film.getId(), film.getName(), film.getDescription(),
-                    film.getReleaseDate(), film.getDuration(), likes
-            );
-            filmStorage.update(updatedFilm);
-            log.info("Пользователь {} поставил лайк фильму {}", userId, filmId);
-        } else {
-            log.warn("Пользователь {} уже ставил лайк фильму {}", userId, filmId);
+        if (!filmStorage.exists(filmId)) {
+            throw new NotFoundException("Фильм не найден");
         }
+        if (!userStorage.exists(userId)) {
+            throw new NotFoundException("Пользователь не найден");
+        }
+        filmStorage.addLike(filmId, userId);
+        log.info("Пользователь {} поставил лайк фильму {}", userId, filmId);
     }
 
     public void removeLike(Integer filmId, Integer userId) {
-        Film film = filmStorage.getById(filmId)
-                .orElseThrow(() -> new NotFoundException("Фильм не найден"));
-
-        userStorage.getById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
-
-        Set<Integer> likes = new HashSet<>(film.getLikes());
-        if (likes.remove(userId)) {
-            Film updatedFilm = new Film(
-                    film.getId(), film.getName(), film.getDescription(),
-                    film.getReleaseDate(), film.getDuration(), likes
-            );
-            filmStorage.update(updatedFilm);
-            log.info("Пользователь {} удалил лайк с фильма {}", userId, filmId);
+        if (!filmStorage.exists(filmId)) {
+            throw new NotFoundException("Фильм не найден");
         }
+        if (!userStorage.exists(userId)) {
+            throw new NotFoundException("Пользователь не найден");
+        }
+        filmStorage.removeLike(filmId, userId);
+        log.info("Пользователь {} удалил лайк с фильма {}", userId, filmId);
     }
 
     public List<Film> getPopularFilms(int count) {
-        return filmStorage.getAll().stream()
-                .sorted((f1, f2) -> {
-                    int likes1 = f1.getLikes() != null ? f1.getLikes().size() : 0;
-                    int likes2 = f2.getLikes() != null ? f2.getLikes().size() : 0;
-                    return Integer.compare(likes2, likes1);
-                })
-                .limit(count)
-                .collect(Collectors.toList());
+        return filmStorage.getPopular(count);
     }
 
     private void validate(Film film) {
