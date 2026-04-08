@@ -3,17 +3,15 @@ package ru.yandex.practicum.filmorate.storage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.storage.mapper.UserRowMapper;
 
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -22,18 +20,19 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserDbStorage implements UserStorage {
     private final JdbcTemplate jdbcTemplate;
+    private final UserRowMapper userRowMapper;
 
     @Override
     public List<User> getAll() {
         String sql = "SELECT * FROM users";
-        List<User> users = jdbcTemplate.query(sql, new UserRowMapper());
+        List<User> users = jdbcTemplate.query(sql, userRowMapper);
         return loadFriendsForUsers(users);
     }
 
     @Override
     public Optional<User> getById(Integer id) {
         String sql = "SELECT * FROM users WHERE id = ?";
-        List<User> users = jdbcTemplate.query(sql, new UserRowMapper(), id);
+        List<User> users = jdbcTemplate.query(sql, userRowMapper, id);
         if (users.isEmpty()) {
             return Optional.empty();
         }
@@ -104,6 +103,31 @@ public class UserDbStorage implements UserStorage {
         return count != null && count > 0;
     }
 
+    @Override
+    public Set<User> getFriends(Integer userId) {
+        String sql = """
+            SELECT u.* FROM users u
+            JOIN friendship f ON u.id = f.friend_id
+            WHERE f.user_id = ? AND f.status = true
+            """;
+        return new HashSet<>(jdbcTemplate.query(sql, userRowMapper, userId));
+    }
+
+    @Override
+    public Set<User> getCommonFriends(Integer userId, Integer otherId) {
+        String sql = """
+            SELECT u.* FROM users u
+            WHERE u.id IN (
+                SELECT f1.friend_id FROM friendship f1
+                WHERE f1.user_id = ? AND f1.status = true
+            ) AND u.id IN (
+                SELECT f2.friend_id FROM friendship f2
+                WHERE f2.user_id = ? AND f2.status = true
+            )
+            """;
+        return new HashSet<>(jdbcTemplate.query(sql, userRowMapper, userId, otherId));
+    }
+
     private List<User> loadFriendsForUsers(List<User> users) {
         if (users.isEmpty()) return users;
 
@@ -134,19 +158,5 @@ public class UserDbStorage implements UserStorage {
             result.add(newUser);
         }
         return result;
-    }
-
-    private static class UserRowMapper implements RowMapper<User> {
-        @Override
-        public User mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return new User(
-                    rs.getInt("id"),
-                    rs.getString("email"),
-                    rs.getString("login"),
-                    rs.getString("name"),
-                    rs.getDate("birthday").toLocalDate(),
-                    new HashSet<>()
-            );
-        }
     }
 }

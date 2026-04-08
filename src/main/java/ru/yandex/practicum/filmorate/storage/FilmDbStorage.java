@@ -3,7 +3,6 @@ package ru.yandex.practicum.filmorate.storage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
@@ -11,10 +10,9 @@ import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.MpaRating;
+import ru.yandex.practicum.filmorate.storage.mapper.FilmRowMapper;
 
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -23,6 +21,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FilmDbStorage implements FilmStorage {
     private final JdbcTemplate jdbcTemplate;
+    private final FilmRowMapper filmRowMapper;
 
     @Override
     public List<Film> getAll() {
@@ -31,7 +30,7 @@ public class FilmDbStorage implements FilmStorage {
                 FROM films f
                 LEFT JOIN mpa_ratings m ON f.mpa_rating_id = m.id
                 """;
-        List<Film> films = jdbcTemplate.query(sql, new FilmRowMapper());
+        List<Film> films = jdbcTemplate.query(sql, filmRowMapper);
         return loadGenresAndLikes(films);
     }
 
@@ -43,7 +42,7 @@ public class FilmDbStorage implements FilmStorage {
                 LEFT JOIN mpa_ratings m ON f.mpa_rating_id = m.id
                 WHERE f.id = ?
                 """;
-        List<Film> films = jdbcTemplate.query(sql, new FilmRowMapper(), id);
+        List<Film> films = jdbcTemplate.query(sql, filmRowMapper, id);
         if (films.isEmpty()) {
             return Optional.empty();
         }
@@ -53,7 +52,6 @@ public class FilmDbStorage implements FilmStorage {
 
     @Override
     public Film create(Film film) {
-        // Проверяем, существует ли MPA рейтинг
         if (film.getMpa() != null && film.getMpa().getId() != null) {
             String checkMpaSql = "SELECT COUNT(*) FROM mpa_ratings WHERE id = ?";
             Integer count = jdbcTemplate.queryForObject(checkMpaSql, Integer.class, film.getMpa().getId());
@@ -89,7 +87,6 @@ public class FilmDbStorage implements FilmStorage {
             throw new NotFoundException("Фильм не найден");
         }
 
-        // Проверяем, существует ли MPA рейтинг
         if (film.getMpa() != null && film.getMpa().getId() != null) {
             String checkMpaSql = "SELECT COUNT(*) FROM mpa_ratings WHERE id = ?";
             Integer count = jdbcTemplate.queryForObject(checkMpaSql, Integer.class, film.getMpa().getId());
@@ -146,7 +143,7 @@ public class FilmDbStorage implements FilmStorage {
                 ORDER BY likes_count DESC
                 LIMIT ?
                 """;
-        List<Film> films = jdbcTemplate.query(sql, new FilmRowMapper(), count);
+        List<Film> films = jdbcTemplate.query(sql, filmRowMapper, count);
         return loadGenresAndLikes(films);
     }
 
@@ -155,7 +152,6 @@ public class FilmDbStorage implements FilmStorage {
         if (genres != null && !genres.isEmpty()) {
             String sql = "INSERT INTO film_genres (film_id, genre_id) VALUES (?, ?)";
             for (Genre genre : genres) {
-                // Проверяем, существует ли жанр
                 String checkGenreSql = "SELECT COUNT(*) FROM genres WHERE id = ?";
                 Integer count = jdbcTemplate.queryForObject(checkGenreSql, Integer.class, genre.getId());
                 if (count == null || count == 0) {
@@ -206,25 +202,5 @@ public class FilmDbStorage implements FilmStorage {
             result.add(newFilm);
         }
         return result;
-    }
-
-    public static class FilmRowMapper implements RowMapper<Film> {
-        @Override
-        public Film mapRow(ResultSet rs, int rowNum) throws SQLException {
-            MpaRating mpa = null;
-            if (rs.getObject("mpa_id") != null) {
-                mpa = new MpaRating(rs.getInt("mpa_id"), rs.getString("mpa_name"));
-            }
-            return new Film(
-                    rs.getInt("id"),
-                    rs.getString("name"),
-                    rs.getString("description"),
-                    rs.getDate("release_date").toLocalDate(),
-                    rs.getInt("duration"),
-                    new HashSet<>(),
-                    new LinkedHashSet<>(),
-                    mpa
-            );
-        }
     }
 }

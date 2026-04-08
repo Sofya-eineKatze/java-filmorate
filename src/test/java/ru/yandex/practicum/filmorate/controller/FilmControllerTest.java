@@ -11,6 +11,8 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.MpaRating;
@@ -18,9 +20,6 @@ import ru.yandex.practicum.filmorate.model.MpaRating;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -57,15 +56,15 @@ class FilmControllerTest {
         Film film = new Film(null, "Inception", "Great movie about dreams",
                 LocalDate.of(2010, 7, 16), 148, new HashSet<>(), genres, mpa);
 
-        mockMvc.perform(post("/films")
+        mockMvc.perform(MockMvcRequestBuilders.post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(film)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").exists())
-                .andExpect(jsonPath("$.name").value("Inception"))
-                .andExpect(jsonPath("$.duration").value(148))
-                .andExpect(jsonPath("$.mpa.id").value(1))
-                .andExpect(jsonPath("$.genres.length()").value(1));
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.id").exists())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.name").value("Inception"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.duration").value(148))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.mpa.id").value(1))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.genres.length()").value(1));
     }
 
     @Test
@@ -74,19 +73,19 @@ class FilmControllerTest {
         Film film1 = new Film(null, "Film1", "Desc1", LocalDate.of(2020, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
         Film film2 = new Film(null, "Film2", "Desc2", LocalDate.of(2021, 2, 2), 90, new HashSet<>(), new HashSet<>(), mpa);
 
-        mockMvc.perform(post("/films")
+        mockMvc.perform(MockMvcRequestBuilders.post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(film1)))
-                .andExpect(status().isOk());
+                .andExpect(MockMvcResultMatchers.status().isOk());
 
-        mockMvc.perform(post("/films")
+        mockMvc.perform(MockMvcRequestBuilders.post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(film2)))
-                .andExpect(status().isOk());
+                .andExpect(MockMvcResultMatchers.status().isOk());
 
-        mockMvc.perform(get("/films"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
+        mockMvc.perform(MockMvcRequestBuilders.get("/films"))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.length()").value(2));
     }
 
     @Test
@@ -95,20 +94,20 @@ class FilmControllerTest {
         Film film = new Film(null, "Find Me", "Find this film",
                 LocalDate.of(2022, 3, 3), 110, new HashSet<>(), new HashSet<>(), mpa);
 
-        String response = mockMvc.perform(post("/films")
+        String response = mockMvc.perform(MockMvcRequestBuilders.post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(film)))
-                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.status().isOk())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
 
         Film created = objectMapper.readValue(response, Film.class);
 
-        mockMvc.perform(get("/films/{id}", created.getId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(created.getId()))
-                .andExpect(jsonPath("$.name").value("Find Me"));
+        mockMvc.perform(MockMvcRequestBuilders.get("/films/{id}", created.getId()))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.id").value(created.getId()))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.name").value("Find Me"));
     }
 
     @Test
@@ -117,10 +116,10 @@ class FilmControllerTest {
         Film film = new Film(null, "Old Name", "Old Desc",
                 LocalDate.of(2020, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
 
-        String response = mockMvc.perform(post("/films")
+        String response = mockMvc.perform(MockMvcRequestBuilders.post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(film)))
-                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.status().isOk())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -131,21 +130,21 @@ class FilmControllerTest {
         Film updated = new Film(created.getId(), "New Name", "New Desc",
                 LocalDate.of(2021, 2, 2), 150, new HashSet<>(), new HashSet<>(), newMpa);
 
-        mockMvc.perform(put("/films")
+        mockMvc.perform(MockMvcRequestBuilders.put("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updated)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("New Name"))
-                .andExpect(jsonPath("$.duration").value(150));
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.name").value("New Name"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.duration").value(150));
     }
 
     @Test
     void shouldAddLike() throws Exception {
         String userJson = "{\"email\":\"test@mail.ru\",\"login\":\"testLogin\",\"name\":\"Test\",\"birthday\":\"2000-01-01\"}";
-        String userResponse = mockMvc.perform(post("/users")
+        String userResponse = mockMvc.perform(MockMvcRequestBuilders.post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(userJson))
-                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.status().isOk())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -156,27 +155,27 @@ class FilmControllerTest {
         Film film = new Film(null, "Liked Film", "Desc",
                 LocalDate.of(2020, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
 
-        String filmResponse = mockMvc.perform(post("/films")
+        String filmResponse = mockMvc.perform(MockMvcRequestBuilders.post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(film)))
-                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.status().isOk())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
 
         Integer filmId = objectMapper.readTree(filmResponse).get("id").asInt();
 
-        mockMvc.perform(put("/films/{id}/like/{userId}", filmId, userId))
-                .andExpect(status().isOk());
+        mockMvc.perform(MockMvcRequestBuilders.put("/films/{id}/like/{userId}", filmId, userId))
+                .andExpect(MockMvcResultMatchers.status().isOk());
     }
 
     @Test
     void shouldGetPopularFilms() throws Exception {
         String userJson = "{\"email\":\"popular@mail.ru\",\"login\":\"popularLogin\",\"name\":\"Popular\",\"birthday\":\"2000-01-01\"}";
-        String userResponse = mockMvc.perform(post("/users")
+        String userResponse = mockMvc.perform(MockMvcRequestBuilders.post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(userJson))
-                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.status().isOk())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -187,22 +186,22 @@ class FilmControllerTest {
         Film film1 = new Film(null, "Popular Film", "Desc1", LocalDate.of(2020, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
         Film film2 = new Film(null, "Not Popular Film", "Desc2", LocalDate.of(2020, 1, 1), 90, new HashSet<>(), new HashSet<>(), mpa);
 
-        String film1Response = mockMvc.perform(post("/films")
+        String film1Response = mockMvc.perform(MockMvcRequestBuilders.post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(film1)))
-                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.status().isOk())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
 
         Integer film1Id = objectMapper.readTree(film1Response).get("id").asInt();
 
-        mockMvc.perform(put("/films/{id}/like/{userId}", film1Id, userId))
-                .andExpect(status().isOk());
+        mockMvc.perform(MockMvcRequestBuilders.put("/films/{id}/like/{userId}", film1Id, userId))
+                .andExpect(MockMvcResultMatchers.status().isOk());
 
-        mockMvc.perform(get("/films/popular"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Popular Film"));
+        mockMvc.perform(MockMvcRequestBuilders.get("/films/popular"))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].name").value("Popular Film"));
     }
 
     @Test
@@ -211,10 +210,10 @@ class FilmControllerTest {
         Film film = new Film(null, "Too Old Film", "Desc",
                 LocalDate.of(1800, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
 
-        mockMvc.perform(post("/films")
+        mockMvc.perform(MockMvcRequestBuilders.post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(film)))
-                .andExpect(status().isBadRequest());
+                .andExpect(MockMvcResultMatchers.status().isBadRequest());
     }
 
     @Test
@@ -223,9 +222,9 @@ class FilmControllerTest {
         Film film = new Film(null, "", "Desc",
                 LocalDate.of(2020, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
 
-        mockMvc.perform(post("/films")
+        mockMvc.perform(MockMvcRequestBuilders.post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(film)))
-                .andExpect(status().isBadRequest());
+                .andExpect(MockMvcResultMatchers.status().isBadRequest());
     }
 }

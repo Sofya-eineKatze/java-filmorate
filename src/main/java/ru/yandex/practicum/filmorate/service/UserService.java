@@ -2,15 +2,14 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.storage.FriendshipDbStorage;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
 
 import java.time.LocalDate;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -19,7 +18,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class UserService {
     private final UserStorage userStorage;
-    private final JdbcTemplate jdbcTemplate;
+    private final FriendshipDbStorage friendshipStorage;
 
     public List<User> getAllUsers() {
         return userStorage.getAll();
@@ -71,8 +70,7 @@ public class UserService {
         if (!userStorage.exists(userId)) {
             throw new NotFoundException("Пользователь не найден");
         }
-
-        jdbcTemplate.update("DELETE FROM friendship WHERE user_id = ?", userId);
+        friendshipStorage.deleteAllByUserId(userId);
         userStorage.delete(userId);
         log.info("Пользователь с id {} удален", userId);
     }
@@ -81,38 +79,24 @@ public class UserService {
         if (userId.equals(friendId)) {
             throw new ValidationException("Нельзя добавить самого себя в друзья");
         }
-
         if (!userStorage.exists(userId)) {
             throw new NotFoundException("Пользователь не найден");
         }
         if (!userStorage.exists(friendId)) {
             throw new NotFoundException("Друг не найден");
         }
-
-        // Проверяем, есть ли уже заявка
-        String checkSql = "SELECT COUNT(*) FROM friendship WHERE user_id = ? AND friend_id = ?";
-        Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class, userId, friendId);
-
-        if (count != null && count > 0) {
-            jdbcTemplate.update("UPDATE friendship SET status = true WHERE user_id = ? AND friend_id = ?", userId, friendId);
-        } else {
-            jdbcTemplate.update("INSERT INTO friendship (user_id, friend_id, status) VALUES (?, ?, ?)", userId, friendId, true);
-        }
-
+        friendshipStorage.addFriend(userId, friendId);
         log.info("Пользователь {} добавил в друзья пользователя {}", userId, friendId);
     }
 
     public void removeFriend(Integer userId, Integer friendId) {
-        // Проверяем, существуют ли пользователи
         if (!userStorage.exists(userId)) {
             throw new NotFoundException("Пользователь не найден");
         }
         if (!userStorage.exists(friendId)) {
             throw new NotFoundException("Друг не найден");
         }
-
-        // Удаляем дружбу (если она есть)
-        jdbcTemplate.update("DELETE FROM friendship WHERE user_id = ? AND friend_id = ?", userId, friendId);
+        friendshipStorage.removeFriend(userId, friendId);
         log.info("Пользователь {} удалил из друзей пользователя {}", userId, friendId);
     }
 
@@ -120,41 +104,17 @@ public class UserService {
         if (!userStorage.exists(userId)) {
             throw new NotFoundException("Пользователь не найден");
         }
-
-        String sql = """
-            SELECT u.* FROM users u
-            JOIN friendship f ON u.id = f.friend_id
-            WHERE f.user_id = ? AND f.status = true
-            """;
-
-        return new HashSet<>(jdbcTemplate.query(sql, (rs, rowNum) -> new User(
-                rs.getInt("id"),
-                rs.getString("email"),
-                rs.getString("login"),
-                rs.getString("name"),
-                rs.getDate("birthday").toLocalDate()
-        ), userId));
+        return userStorage.getFriends(userId);
     }
 
     public Set<User> getCommonFriends(Integer userId, Integer otherId) {
-        String sql = """
-            SELECT u.* FROM users u
-            WHERE u.id IN (
-                SELECT f1.friend_id FROM friendship f1
-                WHERE f1.user_id = ? AND f1.status = true
-            ) AND u.id IN (
-                SELECT f2.friend_id FROM friendship f2
-                WHERE f2.user_id = ? AND f2.status = true
-            )
-            """;
-
-        return new HashSet<>(jdbcTemplate.query(sql, (rs, rowNum) -> new User(
-                rs.getInt("id"),
-                rs.getString("email"),
-                rs.getString("login"),
-                rs.getString("name"),
-                rs.getDate("birthday").toLocalDate()
-        ), userId, otherId));
+        if (!userStorage.exists(userId)) {
+            throw new NotFoundException("Пользователь не найден");
+        }
+        if (!userStorage.exists(otherId)) {
+            throw new NotFoundException("Пользователь не найден");
+        }
+        return userStorage.getCommonFriends(userId, otherId);
     }
 
     private void validate(User user) {
