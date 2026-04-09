@@ -116,15 +116,10 @@ public class UserDbStorage implements UserStorage {
     @Override
     public Set<User> getCommonFriends(Integer userId, Integer otherId) {
         String sql = """
-            SELECT u.* FROM users u
-            WHERE u.id IN (
-                SELECT f1.friend_id FROM friendship f1
-                WHERE f1.user_id = ? AND f1.status = true
-            ) AND u.id IN (
-                SELECT f2.friend_id FROM friendship f2
-                WHERE f2.user_id = ? AND f2.status = true
-            )
-            """;
+        SELECT DISTINCT u.* FROM users u
+        JOIN friendship f1 ON u.id = f1.friend_id AND f1.user_id = ? AND f1.status = true
+        JOIN friendship f2 ON u.id = f2.friend_id AND f2.user_id = ? AND f2.status = true
+        """;
         return new HashSet<>(jdbcTemplate.query(sql, userRowMapper, userId, otherId));
     }
 
