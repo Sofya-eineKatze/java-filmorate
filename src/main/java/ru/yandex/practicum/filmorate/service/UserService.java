@@ -1,26 +1,24 @@
 package ru.yandex.practicum.filmorate.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.storage.FriendshipDbStorage;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
 
 import java.time.LocalDate;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class UserService {
     private final UserStorage userStorage;
-
-    public UserService(UserStorage userStorage) {
-        this.userStorage = userStorage;
-    }
+    private final FriendshipDbStorage friendshipStorage;
 
     public List<User> getAllUsers() {
         return userStorage.getAll();
@@ -69,21 +67,10 @@ public class UserService {
     }
 
     public void deleteUser(Integer userId) {
-        User user = userStorage.getById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
-
-        for (User u : userStorage.getAll()) {
-            if (u.getFriends().contains(userId)) {
-                Set<Integer> newFriends = new HashSet<>(u.getFriends());
-                newFriends.remove(userId);
-                User updated = new User(
-                        u.getId(), u.getEmail(), u.getLogin(),
-                        u.getName(), u.getBirthday(), newFriends
-                );
-                userStorage.update(updated);
-            }
+        if (!userStorage.exists(userId)) {
+            throw new NotFoundException("Пользователь не найден");
         }
-
+        friendshipStorage.deleteAllByUserId(userId);
         userStorage.delete(userId);
         log.info("Пользователь с id {} удален", userId);
     }
@@ -92,71 +79,42 @@ public class UserService {
         if (userId.equals(friendId)) {
             throw new ValidationException("Нельзя добавить самого себя в друзья");
         }
-
-        User user = userStorage.getById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
-        User friend = userStorage.getById(friendId)
-                .orElseThrow(() -> new NotFoundException("Друг не найден"));
-
-        Set<Integer> userFriends = new HashSet<>(user.getFriends());
-        Set<Integer> friendFriends = new HashSet<>(friend.getFriends());
-
-        userFriends.add(friendId);
-        friendFriends.add(userId);
-
-        User updatedUser = new User(user.getId(), user.getEmail(), user.getLogin(), user.getName(), user.getBirthday(), userFriends);
-        User updatedFriend = new User(friend.getId(), friend.getEmail(), friend.getLogin(), friend.getName(), friend.getBirthday(), friendFriends);
-
-        userStorage.update(updatedUser);
-        userStorage.update(updatedFriend);
-
-        log.info("Пользователь {} и {} стали друзьями", userId, friendId);
+        if (!userStorage.exists(userId)) {
+            throw new NotFoundException("Пользователь не найден");
+        }
+        if (!userStorage.exists(friendId)) {
+            throw new NotFoundException("Друг не найден");
+        }
+        friendshipStorage.addFriend(userId, friendId);
+        log.info("Пользователь {} добавил в друзья пользователя {}", userId, friendId);
     }
 
     public void removeFriend(Integer userId, Integer friendId) {
-        User user = userStorage.getById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
-        User friend = userStorage.getById(friendId)
-                .orElseThrow(() -> new NotFoundException("Друг не найден"));
-
-        Set<Integer> userFriends = new HashSet<>(user.getFriends());
-        Set<Integer> friendFriends = new HashSet<>(friend.getFriends());
-
-        userFriends.remove(friendId);
-        friendFriends.remove(userId);
-
-        User updatedUser = new User(user.getId(), user.getEmail(), user.getLogin(), user.getName(), user.getBirthday(), userFriends);
-        User updatedFriend = new User(friend.getId(), friend.getEmail(), friend.getLogin(), friend.getName(), friend.getBirthday(), friendFriends);
-
-        userStorage.update(updatedUser);
-        userStorage.update(updatedFriend);
-
-        log.info("Пользователь {} и {} больше не друзья", userId, friendId);
+        if (!userStorage.exists(userId)) {
+            throw new NotFoundException("Пользователь не найден");
+        }
+        if (!userStorage.exists(friendId)) {
+            throw new NotFoundException("Друг не найден");
+        }
+        friendshipStorage.removeFriend(userId, friendId);
+        log.info("Пользователь {} удалил из друзей пользователя {}", userId, friendId);
     }
 
     public Set<User> getFriends(Integer userId) {
-        User user = userStorage.getById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
-
-        return user.getFriends().stream()
-                .map(id -> userStorage.getById(id).orElse(null))
-                .filter(u -> u != null)
-                .collect(Collectors.toSet());
+        if (!userStorage.exists(userId)) {
+            throw new NotFoundException("Пользователь не найден");
+        }
+        return userStorage.getFriends(userId);
     }
 
     public Set<User> getCommonFriends(Integer userId, Integer otherId) {
-        User user = userStorage.getById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
-        User other = userStorage.getById(otherId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
-
-        Set<Integer> commonIds = new HashSet<>(user.getFriends());
-        commonIds.retainAll(other.getFriends());
-
-        return commonIds.stream()
-                .map(id -> userStorage.getById(id).orElse(null))
-                .filter(u -> u != null)
-                .collect(Collectors.toSet());
+        if (!userStorage.exists(userId)) {
+            throw new NotFoundException("Пользователь не найден");
+        }
+        if (!userStorage.exists(otherId)) {
+            throw new NotFoundException("Пользователь не найден");
+        }
+        return userStorage.getCommonFriends(userId, otherId);
     }
 
     private void validate(User user) {

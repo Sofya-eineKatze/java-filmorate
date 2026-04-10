@@ -21,7 +21,14 @@ public class Film {
     @JsonIgnore
     Set<Integer> likes;
 
+    Set<Genre> genres;
+    MpaRating mpa;  // ← изменено с mpaRating на mpa
+
     public Film(Integer id, String name, String description, LocalDate releaseDate, Integer duration) {
-        this(id, name, description, releaseDate, duration, new HashSet<>());
+        this(id, name, description, releaseDate, duration, new HashSet<>(), null, null);
+    }
+
+    public Film(Integer id, String name, String description, LocalDate releaseDate, Integer duration, Set<Integer> likes) {
+        this(id, name, description, releaseDate, duration, likes, null, null);
     }
 }

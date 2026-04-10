@@ -1,61 +1,230 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import ru.yandex.practicum.filmorate.exception.ValidationException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import ru.yandex.practicum.filmorate.model.Film;
-import ru.yandex.practicum.filmorate.service.FilmService;
-import ru.yandex.practicum.filmorate.storage.FilmStorage;
-import ru.yandex.practicum.filmorate.storage.InMemoryFilmStorage;
-import ru.yandex.practicum.filmorate.storage.InMemoryUserStorage;
-import ru.yandex.practicum.filmorate.storage.UserStorage;
+import ru.yandex.practicum.filmorate.model.Genre;
+import ru.yandex.practicum.filmorate.model.MpaRating;
 
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
-
+@SpringBootTest
+@AutoConfigureMockMvc
+@AutoConfigureTestDatabase
+@Sql(scripts = "classpath:schema.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class FilmControllerTest {
-    private FilmController filmController;
-    private FilmService filmService;
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
-        FilmStorage filmStorage = new InMemoryFilmStorage();
-        UserStorage userStorage = new InMemoryUserStorage();
-        filmService = new FilmService(filmStorage, userStorage);
-        filmController = new FilmController(filmService);
+        jdbcTemplate.execute("DELETE FROM likes");
+        jdbcTemplate.execute("DELETE FROM film_genres");
+        jdbcTemplate.execute("DELETE FROM films");
+        jdbcTemplate.execute("DELETE FROM users");
+        jdbcTemplate.execute("ALTER TABLE films ALTER COLUMN id RESTART WITH 1");
+        jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN id RESTART WITH 1");
+        jdbcTemplate.execute("MERGE INTO mpa_ratings (id, name) VALUES (1, 'G'), (2, 'PG'), (3, 'PG-13'), (4, 'R'), (5, 'NC-17')");
+        jdbcTemplate.execute("MERGE INTO genres (id, name) VALUES (1, 'Комедия'), (2, 'Драма'), (3, 'Мультфильм'), (4, 'Триллер'), (5, 'Документальный'), (6, 'Боевик')");
     }
 
     @Test
-    void shouldAddFilmWhenDataIsValid() {
-        Film film = new Film(null, "Inception", "Description", LocalDate.of(2010, 7, 16), 148);
-        Film addedFilm = filmController.addFilm(film);
-        assertEquals(film.getName(), addedFilm.getName());
-        assertEquals(1, filmController.getAllFilms().size());
+    void shouldAddFilmWhenDataIsValid() throws Exception {
+        Set<Genre> genres = new HashSet<>();
+        genres.add(new Genre(1, "Комедия"));
+        MpaRating mpa = new MpaRating(1, "G");
+        Film film = new Film(null, "Inception", "Great movie about dreams",
+                LocalDate.of(2010, 7, 16), 148, new HashSet<>(), genres, mpa);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/films")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(film)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.id").exists())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.name").value("Inception"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.duration").value(148))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.mpa.id").value(1))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.genres.length()").value(1));
     }
 
     @Test
-    void shouldThrowExceptionWhenNameIsEmpty() {
-        Film film = new Film(null, "", "Description", LocalDate.now(), 100);
-        assertThrows(ValidationException.class, () -> filmController.addFilm(film));
+    void shouldGetAllFilms() throws Exception {
+        MpaRating mpa = new MpaRating(1, "G");
+        Film film1 = new Film(null, "Film1", "Desc1", LocalDate.of(2020, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
+        Film film2 = new Film(null, "Film2", "Desc2", LocalDate.of(2021, 2, 2), 90, new HashSet<>(), new HashSet<>(), mpa);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/films")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(film1)))
+                .andExpect(MockMvcResultMatchers.status().isOk());
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/films")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(film2)))
+                .andExpect(MockMvcResultMatchers.status().isOk());
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/films"))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.length()").value(2));
     }
 
     @Test
-    void shouldThrowExceptionWhenDescriptionIsTooLong() {
-        String longDescription = "a".repeat(201);
-        Film film = new Film(null, "Name", longDescription, LocalDate.now(), 100);
-        assertThrows(ValidationException.class, () -> filmController.addFilm(film));
+    void shouldGetFilmById() throws Exception {
+        MpaRating mpa = new MpaRating(2, "PG");
+        Film film = new Film(null, "Find Me", "Find this film",
+                LocalDate.of(2022, 3, 3), 110, new HashSet<>(), new HashSet<>(), mpa);
+
+        String response = mockMvc.perform(MockMvcRequestBuilders.post("/films")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(film)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Film created = objectMapper.readValue(response, Film.class);
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/films/{id}", created.getId()))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.id").value(created.getId()))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.name").value("Find Me"));
     }
 
     @Test
-    void shouldThrowExceptionWhenReleaseDateIsBeforeCinemaBirthday() {
-        Film film = new Film(null, "Name", "Desc", LocalDate.of(1895, 12, 27), 100);
-        assertThrows(ValidationException.class, () -> filmController.addFilm(film));
+    void shouldUpdateFilm() throws Exception {
+        MpaRating mpa = new MpaRating(1, "G");
+        Film film = new Film(null, "Old Name", "Old Desc",
+                LocalDate.of(2020, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
+
+        String response = mockMvc.perform(MockMvcRequestBuilders.post("/films")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(film)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Film created = objectMapper.readValue(response, Film.class);
+
+        MpaRating newMpa = new MpaRating(2, "PG");
+        Film updated = new Film(created.getId(), "New Name", "New Desc",
+                LocalDate.of(2021, 2, 2), 150, new HashSet<>(), new HashSet<>(), newMpa);
+
+        mockMvc.perform(MockMvcRequestBuilders.put("/films")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updated)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.name").value("New Name"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.duration").value(150));
     }
 
     @Test
-    void shouldThrowExceptionWhenDurationIsNegative() {
-        Film film = new Film(null, "Name", "Desc", LocalDate.now(), -1);
-        assertThrows(ValidationException.class, () -> filmController.addFilm(film));
+    void shouldAddLike() throws Exception {
+        String userJson = "{\"email\":\"test@mail.ru\",\"login\":\"testLogin\",\"name\":\"Test\",\"birthday\":\"2000-01-01\"}";
+        String userResponse = mockMvc.perform(MockMvcRequestBuilders.post("/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(userJson))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Integer userId = objectMapper.readTree(userResponse).get("id").asInt();
+
+        MpaRating mpa = new MpaRating(1, "G");
+        Film film = new Film(null, "Liked Film", "Desc",
+                LocalDate.of(2020, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
+
+        String filmResponse = mockMvc.perform(MockMvcRequestBuilders.post("/films")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(film)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Integer filmId = objectMapper.readTree(filmResponse).get("id").asInt();
+
+        mockMvc.perform(MockMvcRequestBuilders.put("/films/{id}/like/{userId}", filmId, userId))
+                .andExpect(MockMvcResultMatchers.status().isOk());
+    }
+
+    @Test
+    void shouldGetPopularFilms() throws Exception {
+        String userJson = "{\"email\":\"popular@mail.ru\",\"login\":\"popularLogin\",\"name\":\"Popular\",\"birthday\":\"2000-01-01\"}";
+        String userResponse = mockMvc.perform(MockMvcRequestBuilders.post("/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(userJson))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Integer userId = objectMapper.readTree(userResponse).get("id").asInt();
+
+        MpaRating mpa = new MpaRating(1, "G");
+        Film film1 = new Film(null, "Popular Film", "Desc1", LocalDate.of(2020, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
+        Film film2 = new Film(null, "Not Popular Film", "Desc2", LocalDate.of(2020, 1, 1), 90, new HashSet<>(), new HashSet<>(), mpa);
+
+        String film1Response = mockMvc.perform(MockMvcRequestBuilders.post("/films")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(film1)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Integer film1Id = objectMapper.readTree(film1Response).get("id").asInt();
+
+        mockMvc.perform(MockMvcRequestBuilders.put("/films/{id}/like/{userId}", film1Id, userId))
+                .andExpect(MockMvcResultMatchers.status().isOk());
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/films/popular"))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].name").value("Popular Film"));
+    }
+
+    @Test
+    void shouldNotCreateFilmWithInvalidReleaseDate() throws Exception {
+        MpaRating mpa = new MpaRating(1, "G");
+        Film film = new Film(null, "Too Old Film", "Desc",
+                LocalDate.of(1800, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/films")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(film)))
+                .andExpect(MockMvcResultMatchers.status().isBadRequest());
+    }
+
+    @Test
+    void shouldNotCreateFilmWithEmptyName() throws Exception {
+        MpaRating mpa = new MpaRating(1, "G");
+        Film film = new Film(null, "", "Desc",
+                LocalDate.of(2020, 1, 1), 120, new HashSet<>(), new HashSet<>(), mpa);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/films")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(film)))
+                .andExpect(MockMvcResultMatchers.status().isBadRequest());
     }
 }
